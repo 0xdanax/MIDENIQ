@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Miden IQ Test</title>
+  <style>
+    :root{
+      --accent:#ff7a00;
+      --bg:#ffffff;
+      --text:#0f172a;
+      --muted:#64748b;
+      --card:#ffffff;
+      --radius:12px;
+      --shadow: 0 8px 30px rgba(15,23,42,0.06);
+      --glass: rgba(255,255,255,0.6);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
+    /* Header */
+    header{position:fixed;top:0;left:0;right:0;height:64px;display:flex;align-items:center;justify-content:center;padding:0 20px;border-bottom:1px solid #f1f5f9;background:linear-gradient(0deg, rgba(255,255,255,0.8), rgba(255,255,255,0.8));backdrop-filter: blur(4px);z-index:30}
+    header h1{margin:0;font-size:20px;font-weight:800;color:var(--accent);text-align:center}
+    .header-right{position:absolute;right:18px;top:50%;transform:translateY(-50%);display:flex;gap:10px;align-items:center}
+    .connect-btn{background:var(--accent);color:#fff;padding:8px 12px;border-radius:10px;border:0;cursor:pointer;font-weight:700}
+    .addr-badge{font-size:13px;color:var(--muted);padding:6px 10px;border-radius:999px;border:1px solid #eef2ff;background:#fff}
+    /* Page layout */
+    .page{min-height:100vh;padding-top:92px;display:flex;align-items:center;justify-content:center}
+    .card{width:92%;max-width:640px;background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:26px;position:relative;overflow:hidden}
+    .orange-blob{position:absolute;width:420px;height:420px;right:-120px;top:-120px;background:radial-gradient(circle at 50% 50%, rgba(255,122,0,0.07), transparent 70%);z-index:0}
+    .content{position:relative;z-index:1}
+    .intro{ text-align:center;margin-bottom:10px }
+    .intro p{color:var(--muted);margin:6px 0}
+    .credits{color:var(--muted);text-align:center;margin-bottom:14px}
+    .credits a{color:var(--accent);text-decoration:none;font-weight:700;margin:0 6px}
+    /* Quiz */
+    .question{font-weight:700;font-size:18px;margin:6px 0 14px}
+    .options{display:flex;flex-direction:column;gap:10px}
+    .option{padding:12px;border-radius:10px;border:1px solid #e6eef7;background:#fff;cursor:pointer;transition:all .14s}
+    .option:hover{transform:translateY(-2px);border-color:var(--accent);background:#fff7f0}
+    .option.disabled{pointer-events:none;opacity:.95}
+    button.primary{width:100%;padding:12px;border-radius:10px;border:0;background:var(--accent);color:#fff;font-weight:700;cursor:pointer;margin-top:16px}
+    button.ghost{background:transparent;border:1px solid rgba(0,0,0,0.06);padding:10px;border-radius:8px;cursor:pointer}
+    .small{font-size:13px;color:var(--muted)}
+    .center{text-align:center}
+    /* score area */
+    .score{font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px}
+    /* modal */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;z-index:60}
+    .modal{width:90%;max-width:520px;background:#fff;border-radius:12px;padding:18px;box-shadow:0 20px 60px rgba(15,23,42,0.2)}
+    .modal h3{margin:0 0 10px;color:var(--accent)}
+    .modal p{color:var(--muted);margin:6px 0}
+    .spinner{width:36px;height:36px;border-radius:50%;border:4px solid #eee;border-top-color:var(--accent);animation:spin 1s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .success{color:green;font-weight:700}
+    .fail{color:#ef4444;font-weight:700}
+    /* responsive */
+    @media (max-width:520px){
+      header{height:76px}
+      .card{padding:18px}
+    }
+  </style>
+
+  <!-- ethers.js for wallet interactions -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers/dist/ethers.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Miden IQ Test</h1>
+    <div class="header-right">
+      <div id="addr-badge" class="addr-badge"></div>
+      <button id="connectBtn" class="connect-btn"> MIDEN BLOCKCHAIN </button>
+    </div>
+  </header>
+
+  <div class="page">
+    <div class="card">
+      <div class="orange-blob"></div>
+      <div class="content">
+        <div class="intro center">
+          <div class="credits">
+            <a href="https://x.com/0xdanax" target="_blank" rel="noopener">Danax</a> ✦
+            <a href="https://x.com/0xMiden" target="_blank" rel="noopener">Miden</a>
+          </div>
+          <p class="small">10 Quick Qs about Miden Blockchain / One-time attempt per browser.</p>
+        </div>
+
+        <!-- Quiz container -->
+        <div id="quizArea">
+          <div id="question" class="question"></div>
+          <div id="options" class="options"></div>
+          <button id="nextBtn" class="primary" disabled>Next</button>
+        </div>
+
+        <!-- Score area (hidden until finished) -->
+        <div id="scoreArea" style="display:none" class="center">
+          <div class="score" id="scoreText"></div>
+          <p class="small">Well done! You completed the Miden IQ Test.</p>
+          <div style="margin-top:12px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+            <button id="generateProofBtn" class="ghost">Generate Proof</button>
+            <button id="submitProofBtn" class="ghost" disabled>Submit Proof</button>
+          </div>
+          <p style="margin-top:12px" class="small">Made by <a href="https://x.com/0xdanax" target="_blank" rel="noopener">Danax</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal (hidden by default) -->
+  <div id="modal" style="display:none" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h3 id="modalTitle">Generating proof</h3>
+      <p id="modalMsg" class="small">Please wait…</p>
+      <div id="modalBody" style="margin-top:12px"></div>
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+        <button id="modalClose" class="ghost">Close</button>
+        <button id="modalAction" class="primary" style="display:none">Submit proof (sign)</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  /**********************
+   * Data + State
+   **********************/
+  const QUIZ_KEY = "miden_iq_completed_v1";
+  const SUBMITTED_KEY = "miden_proof_submitted_v1";
+
+  const quizData = [
+    { q: "What is Miden Blockchain primarily focused on?", options: ["Proof of Stake scaling", "ZK-rollup with client-side proving", "Layer 1 blockchain consensus", "Cross-chain bridges"], answer: 1 },
+    { q: "What virtual machine does Miden use?", options: ["Cairo VM", "EVM", "Miden VM", "Move VM"], answer: 2 },
+    { q: "Miden’s ZK architecture allows users to generate proofs on:", options: ["The sequencer node", "Their own device", "Validators only", "The Polygon PoS chain"], answer: 1 },
+    { q: "Miden proofs are built on which type of cryptographic primitive?", options: ["Bulletproofs", "STARKs", "SNARKs", "zkSync proofs"], answer: 1 },
+    { q: "What programming language compiles to Miden Assembly?", options: ["Solidity", "Rust", "Miden Assembly (MASM)", "JavaScript"], answer: 2 },
+    { q: "What is one main benefit of Miden’s client-side proving?", options: ["Higher gas fees", "Users control privacy and computation", "Centralized verification", "Requires trusted setup"], answer: 1 },
+    { q: "Miden is developed under which ecosystem?", options: ["zkSync", "StarkNet", "Polygon", "MidenVM"], answer: 3 },
+    { q: "Miden Rollup uses proofs to verify:", options: ["Every block mined", "Off-chain computations", "Token swaps", "Gas prices"], answer: 1 },
+    { q: "What is Miden ultimately trying to enable for users and developers?", options: ["Fully verifiable, private, and self-contained applications", "Faster token swaps on Polygon PoS", "Centralized rollup management", "Traditional smart contracts with no proofs"], answer: 0 },
+    { q: "Miden’s design goal is to allow users to:", options: ["Avoid using wallets", "Prove their own state transitions privately", "Increase gas usage", "Run mining nodes"], answer: 1 }
+  ];
+
+  let current = 0;
+  let score = 0;
+  let proof = null; // mock proof object
+  let provider = null;
+  let signer = null;
+  let userAddress = null;
+
+  // DOM refs
+  const connectBtn = document.getElementById("connectBtn");
+  const addrBadge = document.getElementById("addr-badge");
+  const questionEl = document.getElementById("question");
+  const optionsEl = document.getElementById("options");
+  const nextBtn = document.getElementById("nextBtn");
+  const scoreArea = document.getElementById("scoreArea");
+  const quizArea = document.getElementById("quizArea");
+  const scoreText = document.getElementById("scoreText");
+  const generateProofBtn = document.getElementById("generateProofBtn");
+  const submitProofBtn = document.getElementById("submitProofBtn");
+  const modal = document.getElementById("modal");
+  const modalTitle = document.getElementById("modalTitle");
+  const modalMsg = document.getElementById("modalMsg");
+  const modalBody = document.getElementById("modalBody");
+  const modalClose = document.getElementById("modalClose");
+  const modalAction = document.getElementById("modalAction");
+
+  /**********************
+   * Quiz logic
+   **********************/
+  // check if already completed
+  window.addEventListener("load", () => {
+    if (localStorage.getItem(QUIZ_KEY)) {
+      showLocked();
+    } else {
+      renderQuestion();
+    }
+    // if proof already submitted previously, keep submit button disabled
+    if (localStorage.getItem(SUBMITTED_KEY)) {
+      submitProofBtn.disabled = true;
+      submitProofBtn.textContent = "Proof submitted";
+    }
+  });
+
+  function renderQuestion(){
+    const q = quizData[current];
+    questionEl.textContent = `${current+1}. ${q.q}`;
+    optionsEl.innerHTML = "";
+    nextBtn.disabled = true;
+    q.options.forEach((opt, i) => {
+      const d = document.createElement("div");
+      d.className = "option";
+      d.textContent = opt;
+      d.addEventListener("click", ()=> selectOption(i,d));
+      optionsEl.appendChild(d);
+    });
+  }
+
+  function selectOption(i, el){
+    const opts = optionsEl.querySelectorAll(".option");
+    // lock selections
+    opts.forEach(o => { o.classList.add('disabled'); o.style.pointerEvents="none"; });
+    const correct = quizData[current].answer;
+    if (i === correct){
+      el.style.background = "#d1fae5"; // green
+      el.style.borderColor = "#10b981";
+      score++;
+    } else {
+      el.style.background = "#fee2e2"; // red
+      el.style.borderColor = "#ef4444";
+      // show correct
+      if (opts[correct]) {
+        opts[correct].style.background = "#d1fae5";
+        opts[correct].style.borderColor = "#10b981";
+      }
+    }
+    nextBtn.disabled = false;
+  }
+
+  nextBtn.addEventListener("click", ()=>{
+    current++;
+    if (current < quizData.length) {
+      renderQuestion();
+    } else {
+      finishQuiz();
+    }
+  });
+
+  function finishQuiz(){
+    quizArea.style.display = "none";
+    scoreArea.style.display = "block";
+    scoreText.textContent = `You got ${score} out of ${quizData.length}!`;
+    // mark completed so refreshing won't allow reattempt
+    localStorage.setItem(QUIZ_KEY, "done");
+    updateSubmitBtnState();
+  }
+
+  function showLocked(){
+    // user already completed - show locked message
+    quizArea.style.display = "none";
+    scoreArea.style.display = "block";
+    scoreText.textContent = `You have already completed this quiz.`;
+    // hide proof controls if previously not submitted
+    generateProofBtn.style.display = "none";
+    submitProofBtn.style.display = "none";
+  }
+
+  /**********************
+   * Proof (mock) flow + modal
+   **********************/
+  function openModal(){
+    modal.style.display = "flex";
+  }
+  function closeModal(){
+    modal.style.display = "none";
+    modalBody.innerHTML = "";
+    modalAction.style.display = "none";
+  }
+
+  modalClose.addEventListener("click", closeModal);
+
+  // Generate mock proof
+  generateProofBtn.addEventListener("click", async () => {
+    openModal();
+    modalTitle.textContent = "Generating proof";
+    modalMsg.textContent = "This is a mock proof generation (simulation).";
+    modalBody.innerHTML = `<div style="display:flex;align-items:center;"><span class="spinner"></span><span class="small">Generating cryptographic proof (simulated)...</span></div>`;
+    modalAction.style.display = "none";
+    // simulate time to generate
+    await wait(1600 + Math.random()*1200);
+
+    // create mock proof object
+    proof = {
+      id: randomHex(8),
+      timestamp: Date.now(),
+      quizScore: score,
+      note: "mock-proof-for-demo-only"
+    };
+
+    modalTitle.textContent = "Proof ready";
+    modalMsg.textContent = "A mock proof has been generated for demo purposes.";
+    modalBody.innerHTML = `<pre style="background:#fafafa;padding:10px;border-radius:8px;overflow:auto;font-size:13px">${escapeHtml(JSON.stringify(proof, null, 2))}</pre>`;
+    // Show action: submit (will sign if wallet connected)
+    modalAction.style.display = "inline-block";
+    modalAction.textContent = signer ? "Submit proof (sign & simulate)" : "Submit proof (simulate)";
+    modalAction.disabled = false;
+  });
+
+  // Submit mock proof
+  modalAction.addEventListener("click", async () => {
+    if (!proof) return;
+    modalAction.disabled = true;
+    modalBody.innerHTML = `<div style="display:flex;align-items:center"><span class="spinner"></span><span class="small">Submitting proof...</span></div>`;
+    modalTitle.textContent = "Submitting proof";
+
+    try {
+      let signature = null;
+      if (signer) {
+        // ask wallet to sign the proof string (simulates a wallet-backed submission)
+        const proofStr = JSON.stringify(proof);
+        const sig = await signer.signMessage(proofStr);
+        signature = sig;
+      } else {
+        // simulate network signing delay
+        await wait(900 + Math.random()*800);
+      }
+
+      // simulate "tx hash" or proof receipt id
+      const txid = "0x" + randomHex(20);
+      modalBody.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="success">✅ Proof submitted successfully</div>
+          <div class="small">Proof id: <code>${proof.id}</code></div>
+          <div class="small">Simulated receipt: <code>${txid}</code></div>
+          ${signature ? `<div class="small">Signature (wallet): <code style="word-break:break-all">${signature}</code></div>` : ""}
+        </div>
+      `;
+      modalTitle.textContent = "Submission complete";
+      // mark proof submitted in localStorage so UI can reflect it
+      localStorage.setItem(SUBMITTED_KEY, JSON.stringify({ proofId: proof.id, tx: txid, signature: signature || null }));
+      submitProofBtn.disabled = true;
+      submitProofBtn.textContent = "Proof submitted";
+      // Close modal after short delay
+      setTimeout(() => { closeModal(); }, 1400);
+    } catch (err) {
+      console.error(err);
+      modalBody.innerHTML = `<div class="fail">Submission failed: ${escapeHtml(err.message || String(err))}</div>`;
+      modalAction.disabled = false;
+    }
+  });
+
+  // Hook the top-level submit button (same as modal action but triggers modal if needed)
+  submitProofBtn.addEventListener("click", () => {
+    // if proof not generated, prompt to generate
+    if (!proof) {
+      alert("Please generate a proof first (press Generate Proof).");
+      return;
+    }
+    // open modal to show submit flow
+    openModal();
+    modalTitle.textContent = "Ready to submit";
+    modalMsg.textContent = "Press submit to continue.";
+    modalBody.innerHTML = `<pre style="background:#fafafa;padding:10px;border-radius:8px;overflow:auto;font-size:13px">${escapeHtml(JSON.stringify(proof, null, 2))}</pre>`;
+    modalAction.style.display = "inline-block";
+    modalAction.textContent = signer ? "Submit proof (sign & simulate)" : "Submit proof (simulate)";
+    modalAction.disabled = false;
+  });
+
+  /**********************
+   * Utilities + helpers
+   **********************/
+  function wait(ms){ return new Promise(res=>setTimeout(res, ms)); }
+  function randomHex(bytes=8){
+    // simple random hex generator (not crypto secure in older browsers)
+    const arr = new Uint8Array(bytes);
+    crypto.getRandomValues(arr);
+    return Array.from(arr, b => b.toString(16).padStart(2,'0')).join('');
+  }
+  function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // allow generation to enable submit button
+  generateProofBtn.addEventListener("click", ()=> {
+    submitProofBtn.disabled = false;
+  });
+
+  function updateSubmitBtnState(){
+    // enable only if quiz finished and proof generated and not already submitted
+    const finished = !!localStorage.getItem(QUIZ_KEY);
+    const submitted = !!localStorage.getItem(SUBMITTED_KEY);
+    const hasProof = !!proof;
+    submitProofBtn.disabled = !(finished && hasProof && !submitted);
+  }
+
+  // ensure state updates after wallet connect
+  setInterval(()=> {
+    if (window.ethereum && !provider && window.ethereum.selectedAddress) {
+      // if user already connected outside flow, init
+      if (!provider) {
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+        provider.getSigner().getAddress().then(addr => { userAddress = addr; addrBadge.textContent = short(addr); connectBtn.textContent="Connected"; connectBtn.disabled=true; }).catch(()=>{});
+      }
+    }
+    updateSubmitBtnState();
+  }, 800);
+
+  // keep modal escape / click outside to close
+  modal.addEventListener("click", (e)=> {
+    if (e.target === modal) closeModal();
+  });
+
+  // prevent multiple retake
+  function restartNotAllowed(){
+    alert("This quiz is one-time only. Refresh won't allow a second attempt.");
+  }
+
+  // If user tries to press restart via devtools - not provided here; we keep simple
+
+  </script>
+</body>
+</html>
